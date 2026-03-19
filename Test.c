@@ -1,4 +1,6 @@
 
 //test 
 
-void main(){};
+void main(){
+    printf("hallo");
+}
