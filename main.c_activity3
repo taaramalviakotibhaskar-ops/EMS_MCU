@@ -12,7 +12,7 @@
 #define SYSCFG_BASE 0x40010000UL
 #define ADC_BASE    0x40012400UL
 #define ADC_CMN     0x40012708UL
-#define NVIC_BASE   0xE000E000UL
+#define NVIC_BASE   0xE000E000UL //hello
 
 // RCC REGISTERS
 // RCC = Reset and Clock Control
