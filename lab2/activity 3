@@ -1,0 +1,265 @@
+#include <stdint.h>
+
+// BASE ADDRESSES
+
+
+#define RCC_BASE    0x40021000UL
+#define GPIOA_BASE  0x50000000UL
+#define GPIOB_BASE  0x50000400UL
+#define GPIOC_BASE  0x50000800UL
+#define TIM2_BASE   0x40000000UL
+#define EXTI_BASE   0x40021800UL
+#define SYSCFG_BASE 0x40010000UL
+#define ADC_BASE    0x40012400UL
+#define ADC_CMN     0x40012708UL
+#define NVIC_BASE   0xE000E000UL //hello
+
+// RCC REGISTERS
+// RCC = Reset and Clock Control
+
+#define RCC_IOPENR   (*(volatile uint32_t *)(RCC_BASE + 0x34))
+#define RCC_APBENR1  (*(volatile uint32_t *)(RCC_BASE + 0x3C))
+#define RCC_APBENR2  (*(volatile uint32_t *)(RCC_BASE + 0x40))
+
+// GPIO REGISTERS
+
+#define GPIOA_MODER  (*(volatile uint32_t *)(GPIOA_BASE + 0x00))
+#define GPIOA_ODR    (*(volatile uint32_t *)(GPIOA_BASE + 0x14))
+#define GPIOB_MODER  (*(volatile uint32_t *)(GPIOB_BASE + 0x00))
+#define GPIOB_ODR    (*(volatile uint32_t *)(GPIOB_BASE + 0x14))
+#define GPIOC_MODER  (*(volatile uint32_t *)(GPIOC_BASE + 0x00))
+
+// TIM2 REGISTERS
+
+#define TIM2_CR1     (*(volatile uint32_t *)(TIM2_BASE + 0x00))
+#define TIM2_DIER    (*(volatile uint32_t *)(TIM2_BASE + 0x0C))
+#define TIM2_SR      (*(volatile uint32_t *)(TIM2_BASE + 0x10))
+#define TIM2_PSC     (*(volatile uint32_t *)(TIM2_BASE + 0x28))
+#define TIM2_ARR     (*(volatile uint32_t *)(TIM2_BASE + 0x2C))
+
+// EXTI REGISTERS
+
+#define EXTI_RTSR1   (*(volatile uint32_t *)(EXTI_BASE + 0x00))
+#define EXTI_IMR1    (*(volatile uint32_t *)(EXTI_BASE + 0x80))
+#define EXTI_RPR1    (*(volatile uint32_t *)(EXTI_BASE + 0x0C))
+#define EXTI_EXTICR4 (*(volatile uint32_t *)(EXTI_BASE + 0x6C))
+
+// SYSCFG REGISTER
+
+#define SYSCFG_CFGR1 (*(volatile uint32_t *)(SYSCFG_BASE + 0x00))
+
+// ADC REGISTERS
+
+#define ADC_CFGR1    (*(volatile uint32_t *)(ADC_BASE + 0x0C))
+#define ADC_CFGR2    (*(volatile uint32_t *)(ADC_BASE + 0x10))
+#define ADC_SMPR     (*(volatile uint32_t *)(ADC_BASE + 0x14))
+#define ADC_CHSELR   (*(volatile uint32_t *)(ADC_BASE + 0x28))
+#define ADC_IER      (*(volatile uint32_t *)(ADC_BASE + 0x04))
+#define ADC_CR       (*(volatile uint32_t *)(ADC_BASE + 0x08))
+#define ADC_ISR      (*(volatile uint32_t *)(ADC_BASE + 0x00))
+#define ADC_DR       (*(volatile uint32_t *)(ADC_BASE + 0x40))
+#define ADC_CCR      (*(volatile uint32_t *)(ADC_CMN  + 0x00))
+
+
+// NVIC REGISTERS
+
+#define NVIC_ISER    (*(volatile uint32_t *)(NVIC_BASE + 0x100))
+#define NVIC_IPR3    (*(volatile uint32_t *)(NVIC_BASE + 0x40C))
+#define NVIC_IPR4    (*(volatile uint32_t *)(NVIC_BASE + 0x410))
+#define NVIC_IPR7    (*(volatile uint32_t *)(NVIC_BASE + 0x41C))
+
+// GLOBAL VARIABLES
+volatile uint32_t ms_count        = 0;
+volatile uint8_t  blinking        = 1;
+volatile uint32_t adcValue        = 0;
+volatile uint32_t blink_delay     = 500;
+volatile uint32_t led2_count      = 0;
+
+// INTERRUPT HANDLER — TIM2
+// Called automatically by every 1ms
+void TIM2_IRQHandler(void)
+{
+    // always clear the overflow flag first
+    TIM2_SR &= ~(1 << 0);
+
+    // blinking toggled by button
+    if (blinking)
+    {
+        ms_count++;
+        led2_count++;
+
+        // LED1 — toggles every 500ms = 1Hz
+        if (ms_count >= 500)
+        {
+            ms_count = 0;
+            GPIOA_ODR ^= (1 << 5);
+        }
+
+        // LED2 — toggles every blink_delay ms
+        // blink_delay is set by the ADC handler
+        // ranges from 100ms (5Hz) to 500ms (1Hz)
+        if (led2_count >= blink_delay)
+        {
+            led2_count = 0;
+            GPIOB_ODR ^= (1 << 0); //toggle
+        }
+    }
+}
+
+// INTERRUPT HANDLER usinggg EXTI (Button on PC13)
+// Called automatically when button is pressed
+// Toggles whether LEDs are blinking or stopped
+
+void EXTI4_15_IRQHandler(void)
+{
+    // clear the pending flag first
+    // same reason as TIM2 — must clear or fires forever
+    EXTI_RPR1 = (1 << 13);
+
+    // toggle blinking on or off
+    blinking = !blinking;
+
+    // if we just turned blinking off,
+    // turn both LEDs off immediately
+    if (!blinking)
+    {
+        GPIOA_ODR &= ~(1 << 5);
+        GPIOB_ODR &= ~(1 << 0);
+    }
+}
+
+
+
+void ADC1_COMP_IRQHandler(void)
+{
+
+    adcValue = ADC_DR;
+
+    // clear the end of conversion flag
+    ADC_ISR &= ~(1 << 2);
+
+    blink_delay = 100 + (adcValue * 400) / 4095;
+
+    // reset led2 counter so the new delay is cleaner
+    led2_count = 0;
+
+    // next ADC conversion
+    // restart it gurl
+    ADC_CR |= (1 << 2);
+}
+
+
+// sets all that up then chills out and waits for the interrupt
+int main(void)
+{
+    //ENABLE CLOCKS WE MUST enable the clock for each one before using it ENABLEEE
+
+//turn everybody on
+    // IOPENR controls GPIO port clocks
+    RCC_IOPENR  |= (1 << 0);
+    RCC_IOPENR  |= (1 << 1);
+    RCC_IOPENR  |= (1 << 2);
+
+    RCC_APBENR1 |= (1 << 0);   // power on TIM2
+
+    RCC_APBENR2 |= (1 << 0);   //on SYSCFG
+    RCC_APBENR2 |= (1 << 20);  // on ADC
+
+    // ONFIGURE GPIO PINS
+    // clear and then set
+    GPIOA_MODER &= ~(3 << 10); // bits 11:10
+    GPIOA_MODER |=  (1 << 10);
+
+    GPIOB_MODER &= ~(3 << 0);  // clear 1:0
+    GPIOB_MODER |=  (1 << 0);  // set
+
+    // PC13 = button
+    // PC13 uses the lads 27:26 of GPIOC_MODER <3
+    // 00 = input which is the default, but set it explicitly
+    GPIOC_MODER &= ~(3 << 26); // clear bits 27:26 = input (00)
+
+    // PA0 = potentiometer = analog input for ADC
+    // PA0 uses bits 1:0 of GPIOA_MODER
+    // 11 = analog mode, which connects the pin to the ADC
+    GPIOA_MODER |=  (3 << 0);  // set bits 1:0 to 11 = analog
+
+    // TIM2 to increment
+
+    TIM2_CR1 &= ~(1 << 4);     // count up mode
+
+    TIM2_PSC = 15;              // 16MHz / (15+1) = 1MHz
+
+    TIM2_ARR = 999;             // overflows every 1ms at 1MHz
+
+    // ENABLE TIM2 INTERRUPT
+
+    TIM2_DIER |= (1 << 0);
+
+    // NVIC_IPR3 sets priority for interrupts 12-15
+    // TIM2 is interrupt 15, sits in bits 15:8 of IPR3
+    // lower number = higher priority
+    // we set priority 1 for TIM2
+    NVIC_IPR3 |= (1 << 13);
+
+    // NVIC_ISER bit 15 = enable TIM2 interrupt globally
+    // without this the NVIC ignores TIM2 even if it fires
+    NVIC_ISER |= (1 << 15);
+
+    TIM2_CR1 |= (1 << 0);
+
+
+    EXTI_EXTICR4 |= (0x2 << 8);
+
+    // enable rising edge trigger on line 13
+    // rising edge = voltage goes from LOW to HIGH = button pressed
+    EXTI_RTSR1 |= (1 << 13);
+
+    // unmask line 13 — this allows the interrupt to fire
+    // by default all EXTI lines are masked (blocked)
+    EXTI_IMR1 |= (1 << 13);
+
+    // NVIC_IPR4 sets priority for interrupts 16-19
+    // EXTI4_15 is interrupt 7 — sits in bits 31:24 of IPR1
+    // we give it priority 0 (highest) so it beats TIM2
+    NVIC_IPR4 |= (0 << 30);
+
+    // enable EXTI4_15 interrupt in NVIC
+    // bit 7 = EXTI4_15_IRQn
+    NVIC_ISER |= (1 << 7);
+
+
+    ADC_CFGR1 &= ~(3 << 3);
+    ADC_CFGR2 &= ~(3 << 30);   // asynchronous clock mode
+
+
+    ADC_CCR &= ~(0xF << 18);   // prescaler = 1
+
+    // select channel 0 = PA0
+    ADC_CHSELR = (1 << 0);
+
+
+    ADC_SMPR |= (3 << 0);
+
+
+    ADC_IER |= (1 << 2);
+
+
+    ADC_CR |= (1 << 0);
+
+
+    while (!(ADC_ISR & (1 << 0)));
+
+
+    NVIC_IPR3 |= (2 << 8);
+
+    // enable ADC interrupt in NVIC
+    // bit 12 = ADC1_COMP_IRQn
+    NVIC_ISER |= (1 << 12);
+
+    // start ADC conversion
+    ADC_CR |= (1 << 2);
+
+    for (;;)
+    {
+    }
+}
