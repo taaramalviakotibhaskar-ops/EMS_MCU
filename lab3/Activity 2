@@ -1,0 +1,16 @@
+htim3.Init.Prescaler = 1439;
+htim3.Init.Period    = 999;   // ARR
+HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+
+while (1) { 
+    // Sweep 0° → 180°
+    for (uint32_t ccr = 50; ccr <= 100; ccr++) {
+        __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, ccr);
+        HAL_Delay(20);   // ~20ms per step for smooth sweep
+    }
+    // Sweep 180° → 0°
+    for (uint32_t ccr = 100; ccr >= 50; ccr--) {
+        __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, ccr);
+        HAL_Delay(20);
+    }
+}
