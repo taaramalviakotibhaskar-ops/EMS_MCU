@@ -97,9 +97,8 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  HAL_ADCEx_Calibration_Start(&hadc1);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // Servo PWM
-  HAL_TIM_Base_Start_IT(&htim2);            // LED Interrupt Start
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // Servo
+  HAL_TIM_Base_Start_IT(&htim2);            // LED Blink Interrupt
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -124,8 +123,10 @@ int main(void)
         }
         // The LED blinks via interrupt = servo updates fast
         HAL_Delay(10);
-      /* USER CODE END WHILE */
-    }
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+  }
   /* USER CODE END 3 */
 }
 
@@ -349,7 +350,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, MY_LED_Pin|LED_GREEN_Pin|LED1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, MY_LED_Pin|LED_GREEN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : USART2_TX_Pin */
   GPIO_InitStruct.Pin = USART2_TX_Pin;
@@ -359,12 +360,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF1_USART2;
   HAL_GPIO_Init(USART2_TX_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : MY_LED_Pin LED1_Pin */
-  GPIO_InitStruct.Pin = MY_LED_Pin|LED1_Pin;
+  /*Configure GPIO pin : MY_LED_Pin */
+  GPIO_InitStruct.Pin = MY_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(MY_LED_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LED_GREEN_Pin */
   GPIO_InitStruct.Pin = LED_GREEN_Pin;
@@ -382,9 +383,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM2)
     {
-        // This toggles PA8 every 1 second (500ms on/500ms off is actually a 0.5Hz blink,
-        // but for a 1Hz interrupt, set ARR to 499 for 500ms toggles).
-        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_8);
+        // Change from GPIO_PIN_8 to GPIO_PIN_5
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     }
 }
 /* USER CODE END 4 */
