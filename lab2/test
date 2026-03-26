@@ -98,19 +98,19 @@ void EXTI4_15_IRQHandler(void)
 // ADC ISR — fires when potentiometer reading is ready
 void ADC1_COMP_IRQHandler(void)
 {
-    adcValue = ADC_DR;          // read value (0-4095)
-    ADC_ISR &= ~(1 << 2);      // clear EOC flag
+    adcValue = ADC_DR;          
+    ADC_ISR &= ~(1 << 2);      
 
-    // linear interpolation: 0 → 100ms (5Hz), 4095 → 500ms (1Hz)
+    // change thingy 0 = 100ms (5Hz), 4095 = 500ms (1Hz)
     blink_delay = 100 + (adcValue * 400) / 4095;
 
-    led2_count = 0;             // reset counter so new delay applies immediately
-    ADC_CR |= (1 << 2);        // start next conversion (ADSTART)
+    led2_count = 0;             // reset
+    ADC_CR |= (1 << 2);        
 }
 
 int main(void)
 {
-    // ── ENABLE CLOCKS ──────────────────────────────────────────
+    // ENABLE CLOCKS 
     RCC_IOPENR  |= (1 << 0);   // GPIOA
     RCC_IOPENR  |= (1 << 1);   // GPIOB
     RCC_IOPENR  |= (1 << 2);   // GPIOC
@@ -118,8 +118,7 @@ int main(void)
     RCC_APBENR2 |= (1 << 0);   // SYSCFG
     RCC_APBENR2 |= (1 << 20);  // ADC
 
-    // ── GPIO SETUP ─────────────────────────────────────────────
-    // PA5 as output (LED1)
+    // GPIO SETUP 
     GPIOA_MODER &= ~(3 << 10);
     GPIOA_MODER |=  (1 << 10);
 
@@ -131,14 +130,14 @@ int main(void)
     GPIOC_MODER &= ~(3 << 26);
 
     // PA0 as analog input (potentiometer) — FIX: clear then set
-    GPIOA_MODER &= ~(3 << 0);  // clear bits first
-    GPIOA_MODER |=  (3 << 0);  // set to analog mode (11)
+    GPIOA_MODER &= ~(3 << 0); 
+    GPIOA_MODER |=  (3 << 0);  
 
     // TIM2 SETUP
-    TIM2_CR1  &= ~(1 << 4);    // count up mode
-    TIM2_PSC   = 15;            // 16MHz / 16 = 1MHz
-    TIM2_ARR   = 999;           // overflow every 1ms
-    TIM2_DIER |= (1 << 0);     // enable update interrupt
+    TIM2_CR1  &= ~(1 << 4);   
+    TIM2_PSC   = 15;           
+    TIM2_ARR   = 999;           
+    TIM2_DIER |= (1 << 0);     
     NVIC_SetPriority(TIM2_IRQn, 1);
     NVIC_EnableIRQ(TIM2_IRQn);
     TIM2_CR1  |= (1 << 0);     // start timer
@@ -158,7 +157,7 @@ int main(void)
     ADC_CHSELR = (1 << 0);     // channel 0 = PA0
     ADC_SMPR  |= (3 << 0);     // sampling time 12.5 cycles
 
-    // FIX: calibrate before enabling
+    
     ADC_CR |= (1 << 31);               // start calibration (ADCAL)
     while (ADC_CR & (1 << 31));        // wait for calibration complete
 
